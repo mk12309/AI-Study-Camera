@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+easyocr
+pymongo
+python-multipart
+google-generativeai
+gtts
+pydantic
+motor
+certifi
+python-dotenv
+passlib
+bcrypt==3.2.0
+python-jose[cryptography]
