@@ -346,7 +346,23 @@ class _CameraViewScreenState extends State<CameraViewScreen> {
     if (image != null) _processImage(image);
   }
   void _processImage(XFile image) async {
-    final croppedFile = await ImageCropper().cropImage(sourcePath: image.path, aspectRatioPresets: [CropAspectRatioPreset.original, CropAspectRatioPreset.square], uiSettings: [AndroidUiSettings(toolbarTitle: 'Crop & Enhance', toolbarColor: const Color(0xFF6366F1), toolbarWidgetColor: Colors.white, initAspectRatio: CropAspectRatioPreset.original, lockAspectRatio: false)]);
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: image.path, 
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop & Enhance', 
+          toolbarColor: const Color(0xFF6366F1), 
+          toolbarWidgetColor: Colors.white, 
+          initAspectRatio: CropAspectRatioPreset.original, 
+          lockAspectRatio: false,
+          aspectRatioPresets: [CropAspectRatioPreset.original, CropAspectRatioPreset.square],
+        ),
+        IOSUiSettings(
+          title: 'Crop & Enhance',
+          aspectRatioPresets: [CropAspectRatioPreset.original, CropAspectRatioPreset.square],
+        ),
+      ]
+    );
     if (croppedFile != null) {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ProcessingScreen(image: XFile(croppedFile.path))));
     }
@@ -539,6 +555,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
       }))
     ]));
   }
+}
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+  @override
+  Widget build(BuildContext context) => const PlaceholderScreen("Profile");
 }
 
 // --- UTILS ---
