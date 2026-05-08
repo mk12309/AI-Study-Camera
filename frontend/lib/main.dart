@@ -234,7 +234,7 @@ class MainNavigationHub extends StatefulWidget {
 }
 class _MainNavigationHubState extends State<MainNavigationHub> {
   int _currentIndex = 0;
-  final List<Widget> _screens = [ const HomeScreen(), const LibraryScreen(), const PlaceholderScreen("Explore"), const ProfileScreen() ];
+  final List<Widget> _screens = [ const HomeScreen(), const LibraryScreen(), const ExploreScreen(), const ProfileScreen() ];
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -535,32 +535,141 @@ class LibraryScreen extends StatefulWidget {
 }
 class _LibraryScreenState extends State<LibraryScreen> {
   List<dynamic> _notes = [];
+  String _selectedFilter = "All Notes";
+
   @override
   void initState() { super.initState(); _fetch(); }
   Future<void> _fetch() async {
     final res = await http.get(Uri.parse("$baseUrl/api/notes"), headers: {"Authorization": "Bearer $globalToken"});
     if (mounted) setState(() => _notes = jsonDecode(res.body)['notes'] ?? []);
   }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(title: Text("My Notes", style: GoogleFonts.outfit(fontWeight: FontWeight.bold)), actions: [IconButton(icon: const Icon(Icons.filter_list), onPressed: () {})]), body: Column(children: [
-      Padding(padding: const EdgeInsets.all(24), child: TextField(decoration: InputDecoration(hintText: "Search your notes", prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)))),
-      Expanded(child: ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 24), itemCount: _notes.length, itemBuilder: (context, idx) {
-        final note = _notes[idx];
-        return InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExtractedTextScreen(note: note))), child: Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)), child: Row(children: [
-          Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.description, color: Colors.grey)),
-          const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(note['filename'] ?? "Note", style: const TextStyle(fontWeight: FontWeight.bold)), Text("12 May 2024", style: TextStyle(color: Colors.grey, fontSize: 12))])),
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
-        ])));
-      }))
-    ]));
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text("Library", style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 24)),
+        elevation: 0, backgroundColor: Colors.white, surfaceTintColor: Colors.white,
+        actions: [IconButton(icon: const Icon(Icons.tune), onPressed: () {})],
+      ),
+      body: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8), child: TextField(decoration: InputDecoration(hintText: "Search your notes...", prefixIcon: const Icon(Icons.search), filled: true, fillColor: const Color(0xFFF8FAFC), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)))),
+        const SizedBox(height: 12),
+        SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 24), child: Row(children: [
+          _filterChip("All Notes"), _filterChip("Summaries"), _filterChip("Quizzes"), _filterChip("Flashcards"), _filterChip("Audio"),
+        ])),
+        const SizedBox(height: 24),
+        Expanded(child: ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 24), itemCount: _notes.length, itemBuilder: (context, idx) {
+          final note = _notes[idx];
+          return Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade100)), child: Row(children: [
+            Container(width: 70, height: 70, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.description, color: Colors.grey)),
+            const SizedBox(width: 16),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(note['filename'] ?? "Note", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 4),
+              Text("12 May 2024 • 10:30 AM", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const SizedBox(height: 8),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFF5F3FF), borderRadius: BorderRadius.circular(8)), child: const Text("Summary", style: TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.bold))),
+            ])),
+            IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+          ]));
+        }))
+      ]),
+    );
+  }
+  Widget _filterChip(String label) {
+    bool isSelected = _selectedFilter == label;
+    return GestureDetector(onTap: () => setState(() => _selectedFilter = label), child: Container(margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)), child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))));
   }
 }
 
+// --- EXPLORE SCREEN ---
+class ExploreScreen extends StatelessWidget {
+  const ExploreScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: Text("Explore", style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 24)), elevation: 0, backgroundColor: Colors.white, surfaceTintColor: Colors.white, actions: [IconButton(icon: const Icon(Icons.notifications_none), onPressed: () {})]),
+      body: SingleChildScrollView(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        TextField(decoration: InputDecoration(hintText: "Search topics, questions, notes...", prefixIcon: const Icon(Icons.search), filled: true, fillColor: const Color(0xFFF8FAFC), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
+        const SizedBox(height: 32),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Popular Topics", style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)), Text("View All", style: TextStyle(color: Color(0xFF6366F1), fontSize: 12))]),
+        const SizedBox(height: 16),
+        GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 4, crossAxisSpacing: 12, children: [
+          _topicCard(Icons.calculate, "Mathematics", "120 Notes", const Color(0xFFF5F3FF), const Color(0xFF6366F1)),
+          _topicCard(Icons.science, "Physics", "98 Notes", const Color(0xFFF0F9FF), const Color(0xFF0EA5E9)),
+          _topicCard(Icons.eco, "Biology", "105 Notes", const Color(0xFFF0FDF4), const Color(0xFF22C55E)),
+          _topicCard(Icons.lightbulb, "Chemistry", "87 Notes", const Color(0xFFFFF7ED), const Color(0xFFF97316)),
+        ]),
+        const SizedBox(height: 32),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Recommended for You", style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)), Text("View All", style: TextStyle(color: Color(0xFF6366F1), fontSize: 12))]),
+        const SizedBox(height: 16),
+        _recommendItem("Photosynthesis -\nComplete Guide", "Summary", "12 May 2024 • 5 min read"),
+        _recommendItem("Newton's Laws\nExplained", "Quiz", "10 May 2024 • 10 Questions"),
+        _recommendItem("Cell Structure\nFlashcards", "Flashcards", "8 May 2024 • 20 Cards"),
+        const SizedBox(height: 32),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Trending Quizzes", style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)), Text("View All", style: TextStyle(color: Color(0xFF6366F1), fontSize: 12))]),
+        const SizedBox(height: 16),
+        Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(16)), child: Row(children: [
+          Container(padding: const EdgeInsets.all(8), decoration: const BoxDecoration(color: Color(0xFFFFF7ED), shape: BoxShape.circle), child: const Icon(Icons.emoji_events, color: Color(0xFFF97316))),
+          const SizedBox(width: 16),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("General Knowledge Quiz", style: const TextStyle(fontWeight: FontWeight.bold)), Text("15 Questions", style: TextStyle(color: Colors.grey, fontSize: 12))])),
+          ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text("Start", style: TextStyle(color: Colors.white))),
+        ])),
+        const SizedBox(height: 80),
+      ])),
+    );
+  }
+  Widget _topicCard(IconData i, String l, String c, Color bg, Color ic) => Column(children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)), child: Icon(i, color: ic)), const SizedBox(height: 8), Text(l, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)), Text(c, style: const TextStyle(fontSize: 8, color: Colors.grey))]);
+  Widget _recommendItem(String t, String tag, String d) => Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)), child: Row(children: [
+    Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.description, color: Colors.grey)),
+    const SizedBox(width: 12),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 4), Text(tag, style: const TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.bold)), Text(d, style: const TextStyle(color: Colors.grey, fontSize: 10))])),
+    const Icon(Icons.bookmark_border, color: Colors.grey),
+  ]));
+}
+
+// --- PROFILE SCREEN ---
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
   @override
-  Widget build(BuildContext context) => const PlaceholderScreen("Profile");
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(child: Column(children: [
+        const SizedBox(height: 60),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerRight, child: IconButton(icon: const Icon(Icons.edit_outlined, color: Color(0xFF6366F1)), onPressed: () {}))),
+        const CircleAvatar(radius: 50, backgroundImage: NetworkImage("https://api.dicebear.com/7.x/avataaars/png?seed=Ayesha")),
+        const SizedBox(height: 16),
+        Text(globalUsername, style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold)),
+        Text("$globalUsername@gmail.com", style: const TextStyle(color: Colors.grey)),
+        const SizedBox(height: 32),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          _statItem("46", "Notes"), _statItem("18", "Quizzes"), _statItem("32", "Flashcards"), _statItem("9", "Audios"),
+        ])),
+        const SizedBox(height: 32),
+        _menuItem(Icons.person_outline, "My Account"),
+        _menuItem(Icons.track_changes, "Study Goals"),
+        _menuItem(Icons.settings_outlined, "Settings"),
+        _menuItem(Icons.language, "Language", trailing: "English"),
+        _menuItem(Icons.help_outline, "Help & Support"),
+        _menuItem(Icons.info_outline, "About Us"),
+        _menuItem(Icons.logout, "Log Out", color: Colors.red, isLast: true),
+      ])),
+    );
+  }
+  Widget _statItem(String v, String l) => Column(children: [Text(v, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF6366F1))), Text(l, style: const TextStyle(fontSize: 12, color: Colors.grey))]);
+  Widget _menuItem(IconData i, String l, {Color? color, String? trailing, bool isLast = false}) => Column(children: [
+    Padding(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), child: Row(children: [
+      Icon(i, color: color ?? Colors.grey.shade700, size: 20), const SizedBox(width: 16),
+      Text(l, style: TextStyle(color: color, fontWeight: FontWeight.w500)), const Spacer(),
+      if (trailing != null) Text(trailing, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+      const SizedBox(width: 8), Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+    ])),
+    if (!isLast) const Divider(height: 1, indent: 24, endIndent: 24, color: Color(0xFFF1F5F9)),
+  ]);
 }
 
 // --- UTILS ---
