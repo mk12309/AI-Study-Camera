@@ -361,6 +361,15 @@ class _CameraViewScreenState extends State<CameraViewScreen> {
           title: 'Crop & Enhance',
           aspectRatioPresets: [CropAspectRatioPreset.original, CropAspectRatioPreset.square],
         ),
+        WebUiSettings(
+          context: context,
+          presentStyle: CropperPresentStyle.dialog,
+          boundary: const Boundary(width: 520, height: 520),
+          viewPort: const ViewPort(width: 480, height: 480, type: 'rectangle'),
+          enableExif: true,
+          enableZoom: true,
+          showZoomer: true,
+        ),
       ]
     );
     if (croppedFile != null) {
