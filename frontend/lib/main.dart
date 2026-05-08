@@ -336,10 +336,18 @@ class _CameraViewScreenState extends State<CameraViewScreen> {
   void dispose() { _controller?.dispose(); super.dispose(); }
 
   Future<void> _capture() async {
+    if (_controller == null || !_controller!.value.isInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Camera not ready. Opening system camera instead...")));
+      final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+      if (image != null) _processImage(image);
+      return;
+    }
     try {
       final XFile image = await _controller!.takePicture();
       _processImage(image);
-    } catch (e) { print(e); }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Capture Error: $e")));
+    }
   }
   Future<void> _pickGallery() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
