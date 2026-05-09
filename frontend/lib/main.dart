@@ -309,6 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   Future<void> _login() async {
     setState(() => _isLoading = true);
+    print("Attempting login to $baseUrl/api/login...");
     try {
       final response = await http.post(
         Uri.parse("$baseUrl/api/login"),
@@ -317,15 +318,20 @@ class _LoginScreenState extends State<LoginScreen> {
           "username": _userController.text,
           "password": _passController.text,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
+      
+      print("Response status: ${response.statusCode}");
       final data = jsonDecode(response.body);
+      
       if (data['status'] == 'success') {
         globalToken = data['access_token'];
         globalUsername = data['username'];
+        print("Login Success for $globalUsername");
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MainNavigationHub()),
         );
       } else {
+        print("Login Failed: ${data['message']}");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(data['message'] ?? "Login failed."),
@@ -334,6 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
+      print("Login Connection Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Connection error: $e"),
@@ -398,7 +405,27 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                onPressed: () async {
+                  try {
+                    print("Testing connection to $baseUrl...");
+                    final res = await http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 5));
+                    print("Connection test successful: ${res.statusCode}");
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Server Reachable! IP: $baseUrl"), backgroundColor: Colors.green),
+                    );
+                  } catch (e) {
+                    print("Connection test failed: $e");
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Server NOT Reachable! Check IP $baseUrl. Error: $e"), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.network_check, color: Colors.grey),
+                label: const Text("Check Server Connection", style: TextStyle(color: Colors.grey)),
+              ),
+              const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
