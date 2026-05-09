@@ -11,7 +11,7 @@ import 'dart:io';
 // --- CONFIG & STATE ---
 String globalToken = "";
 String globalUsername = "User";
-const String baseUrl = "http://192.168.10.6:8000";
+const String baseUrl = "http://192.168.10.8:8000";
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 List<CameraDescription> cameras = [];
 
