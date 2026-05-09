@@ -5,6 +5,8 @@
 [![AI](https://img.shields.io/badge/AI-Gemini%201.5%20Flash-purple.svg)](https://ai.google.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue.svg)](https://www.linkedin.com/in/mahnoor-sajjad-61396b409)
+
 **AI Study Camera** is a premium mobile application designed to revolutionize how students study. By simply snapping a photo of handwritten or printed notes, the app uses state-of-the-art AI to transform them into interactive study materials.
 
 ---
@@ -99,6 +101,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to open an issue or submit a pull request to improve the AI Study Camera experience.
+
+---
+
+## 📬 Contact & Socials
+
+**Developer:** Mahnoor Sajjad  
+**LinkedIn:** [mahnoor-sajjad-61396b409](https://www.linkedin.com/in/mahnoor-sajjad-61396b409)  
+**Project Repo:** [AI-Study-Camera](https://github.com/mk12309/AI-Study-Camera)
 
 ---
 *Developed with ❤️ by [mk12309](https://github.com/mk12309)*
