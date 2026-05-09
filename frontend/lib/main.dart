@@ -371,7 +371,7 @@ class _CameraViewScreenState extends State<CameraViewScreen> {
         ),
         WebUiSettings(
           context: context,
-          presentStyle: CropperPresentStyle.dialog,
+          presentStyle: WebPresentStyle.dialog,
         ),
       ]
     );
