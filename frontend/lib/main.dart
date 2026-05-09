@@ -13,9 +13,9 @@ import 'dart:io' show File, SocketException;
 String globalToken = "";
 String globalUsername = "User";
 
-// SMART BASE URL: Uses localhost for Web, and IP for Android
+// SMART BASE URL: Uses 127.0.0.1 for Web to avoid IPv6 localhost issues, and IP for Android
 String get baseUrl {
-  if (kIsWeb) return "http://localhost:8000";
+  if (kIsWeb) return "http://127.0.0.1:8000";
   return "http://192.168.10.8:8000";
 }
 
