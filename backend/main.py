@@ -90,21 +90,33 @@ async def register(user_data: dict):
 
 @app.post("/api/login")
 async def login(user_data: dict):
-    username = user_data.get("username")
-    password = user_data.get("password")
-    
-    users_collection = get_collection("users")
-    user = users_collection.find_one({"username": username})
-    
-    if not user or not verify_password(password, user["password"]):
-        return {"status": "error", "message": "Invalid username or password"}
+    try:
+        username = user_data.get("username")
+        password = user_data.get("password")
         
-    access_token = create_access_token(data={"sub": username})
-    return {
-        "status": "success", 
-        "access_token": access_token,
-        "username": username
-    }
+        print(f"Login attempt: {username}")
+        
+        users_collection = get_collection("users")
+        if users_collection is None:
+            print("Error: Database not connected during login.")
+            return {"status": "error", "message": "Database connection error."}
+            
+        user = users_collection.find_one({"username": username})
+        
+        if not user or not verify_password(password, user["password"]):
+            print(f"Error: Invalid credentials for user '{username}'.")
+            return {"status": "error", "message": "Invalid username or password"}
+            
+        access_token = create_access_token(data={"sub": username})
+        print(f"Success: User '{username}' logged in successfully.")
+        return {
+            "status": "success", 
+            "access_token": access_token,
+            "username": username
+        }
+    except Exception as e:
+        print(f"Exception during login: {e}")
+        return {"status": "error", "message": f"Internal server error: {str(e)}"}
 
 @app.post("/api/upload")
 async def upload_image(file: UploadFile = File(...), username: str = Depends(get_current_user)):

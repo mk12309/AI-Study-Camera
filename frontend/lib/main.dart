@@ -179,6 +179,19 @@ class _LoginScreenState extends State<LoginScreen> {
       const SizedBox(height: 20), _buildInput("Password", Icons.lock_outline, _passController, obscure: true),
       const SizedBox(height: 32),
       _isLoading ? const CircularProgressIndicator() : SizedBox(width: double.infinity, height: 56, child: ElevatedButton(onPressed: _login, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text("Login", style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)))),
+      const SizedBox(height: 16),
+      TextButton.icon(
+        onPressed: () async {
+          try {
+            final res = await http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 5));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Server Reachable! IP: $baseUrl"), backgroundColor: Colors.green));
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Server NOT Reachable! Check IP $baseUrl. Error: $e"), backgroundColor: Colors.red));
+          }
+        },
+        icon: const Icon(Icons.network_check, color: Colors.grey),
+        label: const Text("Check Server Connection", style: TextStyle(color: Colors.grey)),
+      ),
       const SizedBox(height: 24),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text("Don't have an account? "), GestureDetector(onTap: widget.onSignupTap, child: const Text("Sign Up", style: TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold)))])
     ]))));
