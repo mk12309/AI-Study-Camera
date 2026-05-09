@@ -372,8 +372,8 @@ class _CameraViewScreenState extends State<CameraViewScreen> {
         WebUiSettings(
           context: context,
           presentStyle: CropperPresentStyle.dialog,
-          boundary: const Boundary(width: 520, height: 520),
-          viewPort: const ViewPort(width: 480, height: 480, type: 'rectangle'),
+          boundary: const CropperBoundary(width: 520, height: 520),
+          viewPort: const CropperViewPort(width: 480, height: 480, type: 'rectangle'),
           enableExif: true,
           enableZoom: true,
           showZoomer: true,
