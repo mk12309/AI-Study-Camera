@@ -94,28 +94,28 @@ async def login(user_data: dict):
         username = user_data.get("username")
         password = user_data.get("password")
         
-        print(f"Login attempt: {username}")
+        print(f"Login attempt received for: {username}")
         
         users_collection = get_collection("users")
         if users_collection is None:
-            print("Error: Database not connected during login.")
+            print("Login Error: Database is NOT connected.")
             return {"status": "error", "message": "Database connection error."}
             
         user = users_collection.find_one({"username": username})
         
         if not user or not verify_password(password, user["password"]):
-            print(f"Error: Invalid credentials for user '{username}'.")
+            print(f"Login Error: Invalid credentials for {username}")
             return {"status": "error", "message": "Invalid username or password"}
             
         access_token = create_access_token(data={"sub": username})
-        print(f"Success: User '{username}' logged in successfully.")
+        print(f"Login Success: {username} is now logged in.")
         return {
             "status": "success", 
             "access_token": access_token,
             "username": username
         }
     except Exception as e:
-        print(f"Exception during login: {e}")
+        print(f"CRITICAL LOGIN ERROR: {e}")
         return {"status": "error", "message": f"Internal server error: {str(e)}"}
 
 @app.post("/api/upload")
