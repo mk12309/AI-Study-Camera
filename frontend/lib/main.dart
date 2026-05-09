@@ -372,9 +372,6 @@ class _CameraViewScreenState extends State<CameraViewScreen> {
         WebUiSettings(
           context: context,
           presentStyle: CropperPresentStyle.dialog,
-          enableExif: true,
-          enableZoom: true,
-          showZoomer: true,
         ),
       ]
     );
