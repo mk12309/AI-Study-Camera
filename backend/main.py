@@ -23,13 +23,8 @@ async def lifespan(app: FastAPI):
     print("Startup: Connecting to MongoDB...")
     connect_db()
     
-    # Pre-load EasyOCR model
-    print("Startup: Pre-loading EasyOCR fallback model (this may take a moment)...")
-    try:
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-        print("Startup: EasyOCR model loaded successfully.")
-    except Exception as e:
-        print(f"Startup Error: Failed to load EasyOCR: {e}")
+    # Pre-load is no longer needed as we use Gemini Vision
+    print("Startup: Skipping EasyOCR (using Gemini Vision instead).")
     
     print("Server started! Ready for requests.")
     yield
@@ -133,22 +128,21 @@ async def login(user_data: dict):
 
 @app.post("/api/upload")
 async def upload_image(file: UploadFile = File(...), username: str = Depends(get_current_user)):
-    global reader
-    # 1. Load the model ONLY if it hasn't been loaded yet
-    if reader is None:
-        print("Loading AI Model for the first time... this may take a minute.")
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-
+    print(f"DEBUG: Starting upload_image for user: {username}")
     try:
         # Read the file bytes
+        print("DEBUG: Reading file bytes...")
         file_bytes = await file.read()
+        print(f"DEBUG: File size: {len(file_bytes)} bytes")
         mime_type = file.content_type or "image/jpeg"
         
         # 1. Attempt processing with Gemini
-        print(f"Processing {file.filename} with Gemini AI...")
+        print(f"DEBUG: Calling Gemini AI with MIME: {mime_type}...")
         gemini_json_raw = process_image_with_gemini(file_bytes, mime_type)
+        print(f"DEBUG: Gemini raw response received (length: {len(gemini_json_raw)})")
         
         try:
+            print("DEBUG: Parsing JSON response...")
             study_data = json.loads(gemini_json_raw)
             extracted_text = study_data.get("summary", "No summary generated.")
             ai_summary = extracted_text
