@@ -1226,7 +1226,16 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     try {
       var request = http.MultipartRequest('POST', Uri.parse("$baseUrl/api/upload"));
       request.headers["Authorization"] = "Bearer $globalToken";
-      request.files.add(await http.MultipartFile.fromPath('file', widget.image.path));
+      
+      // Fix for Web: read bytes instead of path
+      final bytes = await widget.image.readAsBytes();
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: widget.image.name,
+        ),
+      );
       
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
