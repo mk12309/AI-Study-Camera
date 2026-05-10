@@ -142,8 +142,11 @@ async def upload_image(file: UploadFile = File(...), username: str = Depends(get
             quiz_data = study_data.get("quiz", [])
             cards_data = study_data.get("cards", [])
         except Exception as e:
-            print(f"JSON Parse Error: {e}. Raw: {gemini_json_raw}")
-            extracted_text = gemini_json_raw
+            print(f"--- CRITICAL JSON PARSE ERROR ---")
+            print(f"Error: {e}")
+            print(f"Raw Output from Gemini: {gemini_json_raw}")
+            print(f"----------------------------------")
+            extracted_text = "Analysis failed to structure. Raw output: " + gemini_json_raw
             ai_summary = "Processed but failed to structure data."
             quiz_data = []
             cards_data = []

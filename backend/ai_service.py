@@ -18,15 +18,18 @@ def process_image_with_gemini(image_bytes, mime_type):
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = """
-        Analyze this study material and provide:
-        1. A comprehensive summary.
-        2. A 3-question multiple choice quiz (with options and correct answer).
-        3. 3 Flashcards (Question and Answer pairs).
+        You are an expert tutor. Analyze this study material and provide:
+        1. A comprehensive summary titled "summary".
+        2. A 3-question multiple choice quiz titled "quiz" (each question must have 'question', 'options' list, and 'answer').
+        3. 3 Flashcards titled "cards" (each with 'front' and 'back').
         
-        Return the output ONLY as a valid JSON object with the following keys:
+        CRITICAL: Return the output ONLY as a single valid JSON object. 
+        Do not include any intro or outro text.
+        
+        Structure:
         {
-          "summary": "...",
-          "quiz": [{"question": "...", "options": ["A", "B", "C", "D"], "answer": "..."}],
+          "summary": "Full summary text here...",
+          "quiz": [{"question": "...", "options": ["...", "..."], "answer": "..."}],
           "cards": [{"front": "...", "back": "..."}]
         }
         """
@@ -36,11 +39,17 @@ def process_image_with_gemini(image_bytes, mime_type):
             {"mime_type": mime_type, "data": image_bytes}
         ])
         
-        # Clean the response to ensure it's valid JSON
+        # Robust cleaning of the response
         text = response.text.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
         
+        # Remove any leading/trailing non-JSON characters
+        if "{" in text:
+            text = text[text.find("{"):text.rfind("}")+1]
+        
+        # Replace common AI formatting issues
+        text = text.replace("```json", "").replace("```", "").strip()
+        
+        print(f"DEBUG: Gemini Raw Cleaned Text: {text[:100]}...")
         return text
     except Exception as e:
         return f"Error: {str(e)}"
