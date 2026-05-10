@@ -319,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen> {
           "username": _userController.text,
           "password": _passController.text,
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 30));
       
       print("Response status: ${response.statusCode}");
       final data = jsonDecode(response.body);
@@ -411,7 +411,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () async {
                   try {
                     print("Testing connection to $baseUrl...");
-                    final res = await http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 5));
+                    final res = await http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 30));
                     print("Connection test successful: ${res.statusCode}");
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text("Server Reachable! IP: $baseUrl"), backgroundColor: Colors.green),

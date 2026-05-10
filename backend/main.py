@@ -26,6 +26,21 @@ async def lifespan(app: FastAPI):
     # Pre-load is no longer needed as we use Gemini Vision
     print("Startup: Skipping EasyOCR (using Gemini Vision instead).")
     
+    print("--- AI HEALTH CHECK ---")
+    key = os.getenv("GEMINI_API_KEY")
+    if not key or "YOUR_" in key:
+        print("❌ WARNING: GEMINI_API_KEY is not set correctly in .env!")
+    else:
+        print("✅ GEMINI_API_KEY found. Testing connection...")
+        try:
+            import google.generativeai as genai
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            res = model.generate_content("Ping")
+            print("✅ Gemini AI Connection: SUCCESS")
+        except Exception as e:
+            print(f"❌ Gemini AI Connection: FAILED - {e}")
+    print("-----------------------")
+    
     print("Server started! Ready for requests.")
     yield
     print("Shutting down...")
