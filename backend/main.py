@@ -144,7 +144,9 @@ async def upload_image(file: UploadFile = File(...), username: str = Depends(get
         except Exception as e:
             print(f"--- CRITICAL JSON PARSE ERROR ---")
             print(f"Error: {e}")
-            print(f"Raw Output from Gemini: {gemini_json_raw}")
+            # Write to debug file so I can see it
+            with open("debug_output.txt", "w", encoding="utf-8") as f:
+                f.write(gemini_json_raw)
             print(f"----------------------------------")
             extracted_text = "Analysis failed to structure. Raw output: " + gemini_json_raw
             ai_summary = "Processed but failed to structure data."
