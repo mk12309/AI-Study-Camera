@@ -2401,7 +2401,7 @@ class ProfileScreen extends StatelessWidget {
               onTap: () {
                 globalToken = "";
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const AuthScreen()),
+                  MaterialPageRoute(builder: (_) => const AuthWrapper()),
                   (route) => false,
                 );
               },
