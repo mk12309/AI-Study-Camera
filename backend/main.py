@@ -29,16 +29,26 @@ async def lifespan(app: FastAPI):
     print("--- AI HEALTH CHECK ---")
     key = os.getenv("GEMINI_API_KEY")
     if not key or "YOUR_" in key:
-        print("❌ WARNING: GEMINI_API_KEY is not set correctly in .env!")
+        print("[!] WARNING: GEMINI_API_KEY is not set correctly in .env!")
     else:
-        print("✅ GEMINI_API_KEY found. Testing connection...")
+        print("[+] GEMINI_API_KEY found. Testing connection...")
         try:
             import google.generativeai as genai
             model = genai.GenerativeModel('gemini-1.5-flash')
             res = model.generate_content("Ping")
-            print("✅ Gemini AI Connection: SUCCESS")
+            print("[+] Gemini AI Connection: SUCCESS")
         except Exception as e:
-            print(f"❌ Gemini AI Connection: FAILED - {e}")
+            print(f"[-] Gemini AI Connection: FAILED - {e}")
+    print("-----------------------")
+    
+    import socket
+    try:
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        print(f"SERVER IS LIVE AT: http://{local_ip}:8000")
+        print(f"UPDATE YOUR FLUTTER APP TO USE THIS IP IF IT IS DIFFERENT.")
+    except:
+        print("Could not determine local IP automatically.")
     print("-----------------------")
     
     print("Server started! Ready for requests.")

@@ -22,6 +22,7 @@ String get baseUrl {
 }
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+final ValueNotifier<String> languageNotifier = ValueNotifier("English");
 List<CameraDescription> cameras = [];
 
 // --- APP ENTRY ---
@@ -2402,8 +2403,19 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 32),
             _menuItem(Icons.person_outline, "My Account"),
             _menuItem(Icons.track_changes, "Study Goals"),
-            _menuItem(Icons.settings_outlined, "Settings"),
-            _menuItem(Icons.language, "Language", trailing: "English"),
+            InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
+              child: _menuItem(Icons.settings_outlined, "Settings"),
+            ),
+            ValueListenableBuilder<String>(
+              valueListenable: languageNotifier,
+              builder: (_, lang, __) {
+                return _menuItem(Icons.language, "Language", trailing: lang);
+              },
+            ),
             _menuItem(Icons.help_outline, "Help & Support"),
             _menuItem(Icons.info_outline, "About Us"),
             InkWell(
@@ -2473,6 +2485,117 @@ class ProfileScreen extends StatelessWidget {
         ),
     ],
   );
+}
+
+// --- SETTINGS SCREEN ---
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text("Settings", style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              "Appearance",
+              style: TextStyle(
+                color: Color(0xFF6366F1),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeNotifier,
+            builder: (_, mode, __) {
+              return ListTile(
+                leading: const Icon(Icons.dark_mode_outlined),
+                title: const Text("Dark Mode"),
+                trailing: Switch(
+                  value: mode == ThemeMode.dark,
+                  onChanged: (val) {
+                    themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                  },
+                  activeColor: const Color(0xFF6366F1),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              "Language",
+              style: TextStyle(
+                color: Color(0xFF6366F1),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          ValueListenableBuilder<String>(
+            valueListenable: languageNotifier,
+            builder: (_, lang, __) {
+              return ListTile(
+                leading: const Icon(Icons.language),
+                title: const Text("App Language"),
+                subtitle: Text(lang),
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (context) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _langOption(context, "English"),
+                          _langOption(context, "Urdu"),
+                          _langOption(context, "Arabic"),
+                          const SizedBox(height: 20),
+                        ],
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+          const Divider(),
+          _simpleTile(Icons.notifications_outlined, "Notifications"),
+          _simpleTile(Icons.security_outlined, "Privacy & Security"),
+          _simpleTile(Icons.storage_outlined, "Data Usage"),
+        ],
+      ),
+    );
+  }
+
+  Widget _langOption(BuildContext context, String l) {
+    return ListTile(
+      title: Text(l),
+      onTap: () {
+        languageNotifier.value = l;
+        Navigator.pop(context);
+      },
+      trailing: languageNotifier.value == l ? const Icon(Icons.check, color: Color(0xFF6366F1)) : null,
+    );
+  }
+
+  Widget _simpleTile(IconData i, String t) {
+    return ListTile(
+      leading: Icon(i),
+      title: Text(t),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () {},
+    );
+  }
 }
 
 // --- UTILS ---
