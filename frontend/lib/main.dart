@@ -1225,20 +1225,33 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
         Uri.parse("$baseUrl/api/upload"),
       );
       request.headers["Authorization"] = "Bearer $globalToken";
+      
+      // Use readAsBytes() to support Flutter Web uploads correctly
+      final bytes = await widget.image.readAsBytes();
       request.files.add(
-        await http.MultipartFile.fromPath('file', widget.image.path),
+        http.MultipartFile.fromBytes('file', bytes, filename: widget.image.name.isEmpty ? 'upload.jpg' : widget.image.name),
       );
+      
       var response = await request.send();
       var data = jsonDecode(await response.stream.bytesToString());
       if (mounted) setState(() => _progress = 1.0);
+      
       if (data['status'] == 'success') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => ExtractedTextScreen(note: data)),
         );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? "Upload failed"), backgroundColor: Colors.red));
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload error: $e"), backgroundColor: Colors.red));
+        Navigator.pop(context);
+      }
     }
   }
 
