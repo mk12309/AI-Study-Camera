@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'dart:io' show File, SocketException;
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 // --- CONFIG & STATE ---
 String globalToken = "";
@@ -249,11 +251,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.network(
+          SvgPicture.network(
             image,
             height: 250,
-            errorBuilder: (c, e, s) =>
-                const Icon(Icons.school, size: 150, color: Color(0xFF6366F1)),
+            placeholderBuilder: (context) => const Center(child: CircularProgressIndicator()),
           ),
           const SizedBox(height: 40),
           Text(
@@ -810,42 +811,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     "My Notes",
                     const Color(0xFFFFF7ED),
                     const Color(0xFFF97316),
-                    () => DefaultTabController.of(context).animateTo(1),
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
                   ),
                   _buildActionCard(
                     Icons.description,
                     "Summaries",
                     const Color(0xFFF0F9FF),
                     const Color(0xFF0EA5E9),
-                    () {},
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
                   ),
                   _buildActionCard(
                     Icons.psychology,
                     "Quizzes",
                     const Color(0xFFFEF2F2),
                     const Color(0xFFEF4444),
-                    () {},
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
                   ),
                   _buildActionCard(
                     Icons.style,
                     "Flashcards",
                     const Color(0xFFF0FDF4),
                     const Color(0xFF22C55E),
-                    () {},
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
                   ),
                   _buildActionCard(
                     Icons.volume_up,
                     "Audio",
                     const Color(0xFFF5F3FF),
                     const Color(0xFF8B5CF6),
-                    () {},
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
                   ),
                   _buildActionCard(
                     Icons.history,
                     "History",
                     const Color(0xFFF8FAFC),
                     Colors.grey,
-                    () {},
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
                   ),
                 ],
               ),
@@ -1127,11 +1128,14 @@ class _CameraViewScreenState extends State<CameraViewScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        "GALLERY",
-                        style: GoogleFonts.outfit(
-                          color: Colors.grey,
-                          fontSize: 12,
+                      GestureDetector(
+                        onTap: _pickGallery,
+                        child: Text(
+                          "GALLERY",
+                          style: GoogleFonts.outfit(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 24),
@@ -1220,20 +1224,14 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       if (mounted) setState(() => _progress = i / 10);
     }
     try {
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse("$baseUrl/api/upload"),
-      );
+      var request = http.MultipartRequest('POST', Uri.parse("$baseUrl/api/upload"));
       request.headers["Authorization"] = "Bearer $globalToken";
+      request.files.add(await http.MultipartFile.fromPath('file', widget.image.path));
       
-      // Use readAsBytes() to support Flutter Web uploads correctly
-      final bytes = await widget.image.readAsBytes();
-      request.files.add(
-        http.MultipartFile.fromBytes('file', bytes, filename: widget.image.name.isEmpty ? 'upload.jpg' : widget.image.name),
-      );
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      var data = jsonDecode(response.body);
       
-      var response = await request.send();
-      var data = jsonDecode(await response.stream.bytesToString());
       if (mounted) setState(() => _progress = 1.0);
       
       if (data['status'] == 'success') {
@@ -1242,16 +1240,17 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
           MaterialPageRoute(builder: (_) => ExtractedTextScreen(note: data)),
         );
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? "Upload failed"), backgroundColor: Colors.red));
-          Navigator.pop(context);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload error: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] ?? "Scanning failed"), backgroundColor: Colors.red),
+        );
         Navigator.pop(context);
       }
+    } catch (e) {
+      print("Upload Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
+      Navigator.pop(context);
     }
   }
 
@@ -1737,9 +1736,51 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 }
 
 // --- 11. AUDIO EXPLANATION SCREEN ---
-class AudioExplanationScreen extends StatelessWidget {
+class AudioExplanationScreen extends StatefulWidget {
   final Map<String, dynamic> note;
   const AudioExplanationScreen({super.key, required this.note});
+  @override
+  _AudioExplanationScreenState createState() => _AudioExplanationScreenState();
+}
+
+class _AudioExplanationScreenState extends State<AudioExplanationScreen> {
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _isPlaying = false;
+  double _progress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initTts();
+  }
+
+  void _initTts() {
+    _flutterTts.setStartHandler(() => setState(() => _isPlaying = true));
+    _flutterTts.setCompletionHandler(() => setState(() {
+      _isPlaying = false;
+      _progress = 1.0;
+    }));
+    _flutterTts.setProgressHandler((text, start, end, word) {
+       // Mock progress based on word count if needed
+    });
+  }
+
+  Future<void> _speak() async {
+    String text = widget.note['ai_summary'] ?? "No summary available to read.";
+    await _flutterTts.speak(text);
+  }
+
+  Future<void> _stop() async {
+    await _flutterTts.stop();
+    setState(() => _isPlaying = false);
+  }
+
+  @override
+  void dispose() {
+    _flutterTts.stop();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1757,19 +1798,27 @@ class AudioExplanationScreen extends StatelessWidget {
             const Spacer(),
             Container(
               padding: const EdgeInsets.all(40),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF5F3FF),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F3FF),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  if (_isPlaying)
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                ],
               ),
-              child: const Icon(
-                Icons.headphones,
-                color: Color(0xFF6366F1),
+              child: Icon(
+                _isPlaying ? Icons.graphic_eq : Icons.headphones,
+                color: const Color(0xFF6366F1),
                 size: 100,
               ),
             ),
             const SizedBox(height: 48),
             Text(
-              note['filename'] ?? "Study Audio",
+              widget.note['filename'] ?? "Study Audio",
               style: GoogleFonts.outfit(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -1782,42 +1831,38 @@ class AudioExplanationScreen extends StatelessWidget {
             ),
             const Spacer(),
             Slider(
-              value: 0.3,
+              value: _progress,
               onChanged: (v) {},
               activeColor: const Color(0xFF6366F1),
               inactiveColor: Colors.grey.shade200,
-            ),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("0:15", style: TextStyle(fontSize: 12)),
-                Text("1:45", style: TextStyle(fontSize: 12)),
-              ],
             ),
             const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.skip_previous, size: 32),
+                  icon: const Icon(Icons.replay_10, size: 32),
                   onPressed: () {},
                 ),
                 const SizedBox(width: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF6366F1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow,
-                    color: Colors.white,
-                    size: 48,
+                GestureDetector(
+                  onTap: _isPlaying ? _stop : _speak,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF6366F1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isPlaying ? Icons.stop : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 48,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 24),
                 IconButton(
-                  icon: const Icon(Icons.skip_next, size: 32),
+                  icon: const Icon(Icons.forward_10, size: 32),
                   onPressed: () {},
                 ),
               ],
@@ -1908,75 +1953,83 @@ class _LibraryScreenState extends State<LibraryScreen> {
               itemCount: _notes.length,
               itemBuilder: (context, idx) {
                 final note = _notes[idx];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.shade100),
+                return InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ExtractedTextScreen(note: note),
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade100),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.description,
+                            color: Colors.grey,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.description,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              note['filename'] ?? "Note",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "12 May 2024 • 10:30 AM",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF5F3FF),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                "Summary",
-                                style: TextStyle(
-                                  color: Color(0xFF6366F1),
-                                  fontSize: 10,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                note['filename'] ?? "Note",
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              Text(
+                                "Scanned Note",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5F3FF),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  "Summary",
+                                  style: TextStyle(
+                                    color: Color(0xFF6366F1),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.more_vert),
-                        onPressed: () {},
-                      ),
-                    ],
+                        IconButton(
+                          icon: const Icon(Icons.more_vert),
+                          onPressed: () {},
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -2344,7 +2397,16 @@ class ProfileScreen extends StatelessWidget {
             _menuItem(Icons.language, "Language", trailing: "English"),
             _menuItem(Icons.help_outline, "Help & Support"),
             _menuItem(Icons.info_outline, "About Us"),
-            _menuItem(Icons.logout, "Log Out", color: Colors.red, isLast: true),
+            InkWell(
+              onTap: () {
+                globalToken = "";
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AuthScreen()),
+                  (route) => false,
+                );
+              },
+              child: _menuItem(Icons.logout, "Log Out", color: Colors.red, isLast: true),
+            ),
           ],
         ),
       ),
