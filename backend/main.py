@@ -53,8 +53,21 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-def read_root():
+@app.on_event("startup")
+async def startup_event():
+    print("--- SYSTEM STARTUP ---")
+    key = os.getenv("GEMINI_API_KEY")
+    if not key or "YOUR_" in key:
+        print("❌ WARNING: GEMINI_API_KEY is not set correctly in .env!")
+    else:
+        print("✅ GEMINI_API_KEY found. Testing connection...")
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            res = model.generate_content("Ping")
+            print("✅ Gemini AI Connection: SUCCESS")
+        except Exception as e:
+            print(f"❌ Gemini AI Connection: FAILED - {e}")
+    print("-----------------------")
     return {"message": "Welcome to the AI Study Camera API!"}
 
 @app.post("/api/register")
@@ -144,12 +157,14 @@ async def upload_image(file: UploadFile = File(...), username: str = Depends(get
         except Exception as e:
             print(f"--- CRITICAL JSON PARSE ERROR ---")
             print(f"Error: {e}")
-            # Write to debug file so I can see it
+            # Write to debug file
             with open("debug_output.txt", "w", encoding="utf-8") as f:
-                f.write(gemini_json_raw)
+                f.write(f"ERROR: {str(e)}\n\nRAW OUTPUT:\n{gemini_json_raw}")
             print(f"----------------------------------")
-            extracted_text = "Analysis failed to structure. Raw output: " + gemini_json_raw
-            ai_summary = "Processed but failed to structure data."
+            extracted_text = "FAILED TO EXTRACT TEXT. Please check your API key and server logs. "
+            if "Error" in gemini_json_raw:
+                extracted_text += gemini_json_raw
+            ai_summary = "Structured data generation failed."
             quiz_data = []
             cards_data = []
         
