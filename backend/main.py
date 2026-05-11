@@ -1,31 +1,24 @@
-from fastapi import FastAPI, File, UploadFile, Depends
+from contextlib import asynccontextmanager
+from datetime import datetime
+import json
+import os
+import socket
+
+from fastapi import Depends, FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from database import connect_db, get_db, get_collection
-import easyocr
-import os
-import shutil
-import json
-from datetime import datetime
-from ai_service import summarize_text, process_image_with_gemini
-from auth import get_password_hash, verify_password, create_access_token, decode_access_token, get_current_user
-from contextlib import asynccontextmanager
-import logging
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from ai_service import process_image_with_gemini
+from auth import create_access_token, get_current_user, get_password_hash, verify_password
+from database import connect_db, get_collection, get_db
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global reader
-    # Connect to MongoDB when the server starts
     print("Startup: Connecting to MongoDB...")
     connect_db()
-    
-    # Pre-load is no longer needed as we use Gemini Vision
+
     print("Startup: Skipping EasyOCR (using Gemini Vision instead).")
-    
     print("--- AI HEALTH CHECK ---")
     key = os.getenv("GEMINI_API_KEY")
     if not key or "YOUR_" in key:
@@ -34,36 +27,35 @@ async def lifespan(app: FastAPI):
         print("[+] GEMINI_API_KEY found. Testing connection...")
         try:
             import google.generativeai as genai
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            res = model.generate_content("Ping")
+
+            model = genai.GenerativeModel("gemini-1.5-flash-latest")
+            model.generate_content("Ping")
             print("[+] Gemini AI Connection: SUCCESS")
-        except Exception as e:
-            print(f"[-] Gemini AI Connection: FAILED - {e}")
+        except Exception as exc:
+            print(f"[-] Gemini AI Connection: FAILED - {exc}")
     print("-----------------------")
-    
-    import socket
+
     try:
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
         print(f"SERVER IS LIVE AT: http://{local_ip}:8000")
-        print(f"UPDATE YOUR FLUTTER APP TO USE THIS IP IF IT IS DIFFERENT.")
-    except:
+        print("Use this IP in Flutter for a physical Android/iOS device.")
+    except Exception:
         print("Could not determine local IP automatically.")
     print("-----------------------")
-    
+
     print("Server started! Ready for requests.")
     yield
     print("Shutting down...")
 
-# Initialize the FastAPI App
+
 app = FastAPI(
     title="AI Study Camera API",
     description="Backend for the Snap & Learn mobile application",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-# Allow Flutter app to communicate with the backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -73,205 +65,193 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def startup_event():
-    print("--- SYSTEM STARTUP ---")
-    key = os.getenv("GEMINI_API_KEY")
-    if not key or "YOUR_" in key:
-        print("❌ WARNING: GEMINI_API_KEY is not set correctly in .env!")
-    else:
-        print("✅ GEMINI_API_KEY found. Testing connection...")
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            res = model.generate_content("Ping")
-            print("✅ Gemini AI Connection: SUCCESS")
-        except Exception as e:
-            print(f"❌ Gemini AI Connection: FAILED - {e}")
-    print("-----------------------")
-    return {"message": "Welcome to the AI Study Camera API!"}
+@app.get("/")
+async def health_check():
+    return {"status": "success", "message": "AI Study Camera API is running"}
+
 
 @app.post("/api/register")
 async def register(user_data: dict):
     try:
         username = user_data.get("username")
         password = user_data.get("password")
-        
+
         print(f"Registering user: {username}")
-        
+
         if not username or not password:
             return {"status": "error", "message": "Username and password are required"}
-            
+
         users_collection = get_collection("users")
         if users_collection is None:
             print("Error: users_collection is None. Database connection failed.")
-            return {"status": "error", "message": "Database connection error. Please check your MONGO_URI."}
-            
+            return {
+                "status": "error",
+                "message": "Database connection error. Please check your MONGO_URI.",
+            }
+
         if users_collection.find_one({"username": username}):
             print(f"Error: Username '{username}' already exists.")
             return {"status": "error", "message": "Username already exists"}
-            
+
         hashed_password = get_password_hash(password)
-        users_collection.insert_one({
-            "username": username,
-            "password": hashed_password
-        })
+        users_collection.insert_one({"username": username, "password": hashed_password})
         print(f"Success: User '{username}' registered successfully.")
         return {"status": "success", "message": "User registered successfully"}
-    except Exception as e:
-        print(f"Exception during registration: {e}")
-        return {"status": "error", "message": f"Internal server error: {str(e)}"}
+    except Exception as exc:
+        print(f"Exception during registration: {exc}")
+        return {"status": "error", "message": f"Internal server error: {exc}"}
+
 
 @app.post("/api/login")
 async def login(user_data: dict):
     try:
         username = user_data.get("username")
         password = user_data.get("password")
-        
+
         print(f"Login attempt received for: {username}")
-        
+
         users_collection = get_collection("users")
         if users_collection is None:
             print("Login Error: Database is NOT connected.")
             return {"status": "error", "message": "Database connection error."}
-            
+
         user = users_collection.find_one({"username": username})
-        
         if not user or not verify_password(password, user["password"]):
             print(f"Login Error: Invalid credentials for {username}")
             return {"status": "error", "message": "Invalid username or password"}
-            
+
         access_token = create_access_token(data={"sub": username})
         print(f"Login Success: {username} is now logged in.")
         return {
-            "status": "success", 
+            "status": "success",
             "access_token": access_token,
-            "username": username
+            "username": username,
         }
-    except Exception as e:
-        print(f"CRITICAL LOGIN ERROR: {e}")
-        return {"status": "error", "message": f"Internal server error: {str(e)}"}
+    except Exception as exc:
+        print(f"CRITICAL LOGIN ERROR: {exc}")
+        return {"status": "error", "message": f"Internal server error: {exc}"}
+
 
 @app.post("/api/upload")
-async def upload_image(file: UploadFile = File(...), username: str = Depends(get_current_user)):
+async def upload_image(
+    file: UploadFile = File(...),
+    username: str = Depends(get_current_user),
+):
     print(f"DEBUG: Starting upload_image for user: {username}")
     try:
-        # Read the file bytes
         print("DEBUG: Reading file bytes...")
         file_bytes = await file.read()
         print(f"DEBUG: File size: {len(file_bytes)} bytes")
         mime_type = file.content_type or "image/jpeg"
-        
-        # 1. Attempt processing with Gemini
+
         print(f"DEBUG: Calling Gemini AI with MIME: {mime_type}...")
         gemini_json_raw = process_image_with_gemini(file_bytes, mime_type)
         print(f"DEBUG: Gemini raw response received (length: {len(gemini_json_raw)})")
-        
+
         try:
             print("DEBUG: Parsing JSON response...")
             study_data = json.loads(gemini_json_raw)
-            extracted_text = study_data.get("summary", "No summary generated.")
-            ai_summary = extracted_text
+            ai_summary = study_data.get("summary", "No summary generated.")
             quiz_data = study_data.get("quiz", [])
             cards_data = study_data.get("cards", [])
-        except Exception as e:
-            print(f"--- CRITICAL JSON PARSE ERROR ---")
-            print(f"Error: {e}")
-            # Write to debug file
-            with open("debug_output.txt", "w", encoding="utf-8") as f:
-                f.write(f"ERROR: {str(e)}\n\nRAW OUTPUT:\n{gemini_json_raw}")
-            print(f"----------------------------------")
-            extracted_text = "FAILED TO EXTRACT TEXT. Please check your API key and server logs. "
+        except Exception as exc:
+            print("--- CRITICAL JSON PARSE ERROR ---")
+            print(f"Error: {exc}")
+            with open("debug_output.txt", "w", encoding="utf-8") as debug_file:
+                debug_file.write(f"ERROR: {exc}\n\nRAW OUTPUT:\n{gemini_json_raw}")
+            print("----------------------------------")
+
+            ai_summary = "FAILED TO EXTRACT TEXT. Please check your API key and server logs."
             if "Error" in gemini_json_raw:
-                extracted_text += gemini_json_raw
-            ai_summary = "Structured data generation failed."
+                ai_summary += f" {gemini_json_raw}"
             quiz_data = []
             cards_data = []
-        
-        # 3. Save to MongoDB
+
         db = get_db()
         if db is not None:
             try:
-                notes_collection = db["scanned_notes"]
-                notes_collection.insert_one({
-                    "username": username,
-                    "filename": file.filename,
-                    "extracted_text": ai_summary,
-                    "ai_summary": ai_summary,
-                    "quiz": quiz_data,
-                    "cards": cards_data,
-                    "timestamp": datetime.now().isoformat()
-                })
-            except Exception as e:
-                print(f"Database exception: {e}")
-            
+                db["scanned_notes"].insert_one(
+                    {
+                        "username": username,
+                        "filename": file.filename,
+                        "extracted_text": ai_summary,
+                        "ai_summary": ai_summary,
+                        "quiz": quiz_data,
+                        "cards": cards_data,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+            except Exception as exc:
+                print(f"Database exception: {exc}")
+
         return {
             "status": "success",
-            "filename": file.filename, 
+            "filename": file.filename,
             "extracted_text": ai_summary,
             "ai_summary": ai_summary,
             "quiz": quiz_data,
             "cards": cards_data,
-            "message": "Processed successfully!"
+            "message": "Processed successfully!",
         }
 
-    except Exception as e:
-        print(f"Error during OCR extraction: {e}")
+    except Exception as exc:
+        print(f"Error during OCR extraction: {exc}")
         return {
-            "status": "error", 
+            "status": "error",
             "filename": file.filename,
-            "extracted_text": f"Error: Failed to process image. Details: {e}",
-            "message": "Failed to process image."
+            "extracted_text": f"Error: Failed to process image. Details: {exc}",
+            "message": "Failed to process image.",
         }
+
 
 @app.get("/api/notes")
 async def get_notes(username: str = Depends(get_current_user)):
     try:
         notes_collection = get_collection("scanned_notes")
         if notes_collection is not None:
-            # Fetch only the notes belonging to this user
             notes = list(notes_collection.find({"username": username}, {"_id": 0}))
             return {"status": "success", "notes": notes}
         return {"status": "error", "message": "Database not connected"}
-    except Exception as e:
-        print(f"Error fetching notes: {e}")
-        return {"status": "error", "message": str(e)}
+    except Exception as exc:
+        print(f"Error fetching notes: {exc}")
+        return {"status": "error", "message": str(exc)}
+
 
 @app.get("/api/stats")
 async def get_stats(username: str = Depends(get_current_user)):
     try:
         notes_collection = get_collection("scanned_notes")
         if notes_collection is not None:
-            # Count user's notes
             total_notes = notes_collection.count_documents({"username": username})
-            
-            # Simulated calculation for Demo
-            study_hours = total_notes * 0.5 # Assume 30 mins per note
-            avg_score = 85 # Placeholder
-            streak = 5 # Placeholder
-            
+            study_hours = total_notes * 0.5
+
             return {
                 "status": "success",
                 "total_notes": total_notes,
                 "study_hours": f"{study_hours:.1f}",
-                "avg_score": f"{avg_score}%",
-                "streak": f"{streak}"
+                "avg_score": "85%",
+                "streak": "5",
             }
         return {"status": "error", "message": "Database not connected"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+
 
 @app.delete("/api/notes")
 async def delete_all_notes(username: str = Depends(get_current_user)):
     try:
         notes_collection = get_collection("scanned_notes")
         if notes_collection is not None:
-            # Only delete notes for the current user
             result = notes_collection.delete_many({"username": username})
-            return {"status": "success", "message": f"Deleted {result.deleted_count} notes successfully!"}
+            return {
+                "status": "success",
+                "message": f"Deleted {result.deleted_count} notes successfully!",
+            }
         return {"status": "error", "message": "Database not connected"}
-    except Exception as e:
-        print(f"Error deleting notes: {e}")
-        return {"status": "error", "message": str(e)}
+    except Exception as exc:
+        print(f"Error deleting notes: {exc}")
+        return {"status": "error", "message": str(exc)}
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

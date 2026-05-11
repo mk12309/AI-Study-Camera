@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'dart:io' show File, SocketException;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -15,10 +14,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 String globalToken = "";
 String globalUsername = "User";
 
-// SMART BASE URL: Uses 127.0.0.1 for Web to avoid IPv6 localhost issues, and IP for Android
+const String _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+// Override with: flutter run --dart-define=API_BASE_URL=http://YOUR_IP:8000
 String get baseUrl {
-  // Use LAN IP for both web and mobile to ensure reachable backend
-  return "http://192.168.10.7:8000";
+  if (_configuredBaseUrl.isNotEmpty) return _configuredBaseUrl;
+  return kIsWeb ? "http://127.0.0.1:8000" : "http://192.168.10.7:8000";
 }
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);

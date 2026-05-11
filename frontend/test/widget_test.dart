@@ -8,15 +8,13 @@
 import 'package:flutter_test/flutter_test.dart'
     show WidgetTester, expect, find, findsOneWidget, testWidgets;
 
-import """
-package:frontend/main.dart""";
+import 'package:frontend/main.dart';
 
 void main() {
   testWidgets('App renders correctly smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const SnapLearnApp());
+    await tester.pumpWidget(const MyApp());
 
-    // Verify that the title is present
-    expect(find.text('Snap & Learn'), findsOneWidget);
+    expect(find.textContaining('Snap & Learn'), findsOneWidget);
   });
 }

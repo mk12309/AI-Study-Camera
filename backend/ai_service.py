@@ -15,7 +15,7 @@ def process_image_with_gemini(image_bytes, mime_type):
         return "Error: GEMINI_API_KEY missing."
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
         prompt = """
         You are an expert tutor. Analyze this study material and provide:
@@ -57,7 +57,7 @@ def process_image_with_gemini(image_bytes, mime_type):
 def summarize_text(text):
     """Fallback if Gemini Vision fails but we have extracted text"""
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         response = model.generate_content(f"Summarize this study text and provide 3 quiz questions and 3 flashcards in JSON format: {text}")
         return response.text
     except:

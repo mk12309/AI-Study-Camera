@@ -1,7 +1,13 @@
 from pymongo import MongoClient
 import certifi
+import os
+from dotenv import load_dotenv
 
-MONGO_URI = "mongodb+srv://MAHNOOR:12345@cluster0.ttnxxc7.mongodb.net/?appName=Cluster0"
+load_dotenv()
+MONGO_URI = os.getenv("MONGO_URI")
+
+if not MONGO_URI:
+    raise SystemExit("MONGO_URI is not set. Add it to backend/.env before running this test.")
 
 try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())
@@ -15,4 +21,5 @@ try:
 except Exception as e:
     print(f"MongoDB connection failed: {e}")
 finally:
-    client.close()
+    if "client" in locals():
+        client.close()
