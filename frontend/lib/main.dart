@@ -17,6 +17,7 @@ String globalUsername = "User";
 
 // SMART BASE URL: Uses 127.0.0.1 for Web to avoid IPv6 localhost issues, and IP for Android
 String get baseUrl {
+  // Use LAN IP for both web and mobile to ensure reachable backend
   return "http://192.168.10.7:8000";
 }
 
