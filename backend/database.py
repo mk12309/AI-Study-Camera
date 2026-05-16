@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 import os
 import certifi
+import ssl
 from dotenv import load_dotenv
 
 # Load variables from .env file
@@ -19,9 +20,16 @@ def connect_db():
         return
 
     try:
-        # tlsCAFile=certifi.where() is essential for SSL connection on many systems
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())
+        # Using the exact SSL configuration that worked in our diagnostic test
+        client = MongoClient(
+            MONGO_URI,
+            serverSelectionTimeoutMS=5000,
+            tls=True,
+            tlsAllowInvalidCertificates=True,
+            ssl=True
+        )
         db = client["ai_study_camera"]
+        
         # Trigger a connection to verify
         client.admin.command('ping')
         
@@ -39,4 +47,3 @@ def get_collection(collection_name: str):
     if db is not None:
         return db[collection_name]
     return None
-

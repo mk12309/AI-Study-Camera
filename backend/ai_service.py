@@ -15,7 +15,7 @@ def process_image_with_gemini(image_bytes, mime_type):
         return "Error: GEMINI_API_KEY missing."
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = """
         You are an expert tutor. Analyze this study material and provide:

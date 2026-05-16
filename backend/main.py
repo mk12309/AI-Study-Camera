@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
         try:
             import google.generativeai as genai
 
-            model = genai.GenerativeModel("gemini-1.5-flash-latest")
+            model = genai.GenerativeModel("gemini-2.5-flash")
             model.generate_content("Ping")
             print("[+] Gemini AI Connection: SUCCESS")
         except Exception as exc:
@@ -142,7 +142,9 @@ async def upload_image(
         print("DEBUG: Reading file bytes...")
         file_bytes = await file.read()
         print(f"DEBUG: File size: {len(file_bytes)} bytes")
-        mime_type = file.content_type or "image/jpeg"
+        mime_type = file.content_type
+        if not mime_type or mime_type == "application/octet-stream":
+            mime_type = "image/jpeg"
 
         print(f"DEBUG: Calling Gemini AI with MIME: {mime_type}...")
         gemini_json_raw = process_image_with_gemini(file_bytes, mime_type)
@@ -209,11 +211,29 @@ async def get_notes(username: str = Depends(get_current_user)):
     try:
         notes_collection = get_collection("scanned_notes")
         if notes_collection is not None:
-            notes = list(notes_collection.find({"username": username}, {"_id": 0}))
+            notes = list(notes_collection.find({"username": username}))
+            # Convert ObjectId to string for JSON serialization
+            for note in notes:
+                note["_id"] = str(note["_id"])
             return {"status": "success", "notes": notes}
         return {"status": "error", "message": "Database not connected"}
     except Exception as exc:
         print(f"Error fetching notes: {exc}")
+        return {"status": "error", "message": str(exc)}
+
+@app.delete("/api/notes/{note_id}")
+async def delete_note(note_id: str, username: str = Depends(get_current_user)):
+    try:
+        from bson.objectid import ObjectId
+        notes_collection = get_collection("scanned_notes")
+        if notes_collection is not None:
+            result = notes_collection.delete_one({"_id": ObjectId(note_id), "username": username})
+            if result.deleted_count > 0:
+                return {"status": "success", "message": "Note deleted successfully!"}
+            return {"status": "error", "message": "Note not found or unauthorized"}
+        return {"status": "error", "message": "Database not connected"}
+    except Exception as exc:
+        print(f"Error deleting note: {exc}")
         return {"status": "error", "message": str(exc)}
 
 

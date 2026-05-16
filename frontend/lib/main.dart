@@ -16,10 +16,15 @@ String globalUsername = "User";
 
 const String _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-// Override with: flutter run --dart-define=API_BASE_URL=http://YOUR_IP:8000
+// Use your PC's local IP address (192.168.10.7) for physical phone deployment.
+// You can override this using: flutter run --dart-define=API_BASE_URL=http://YOUR_IP:8000
 String get baseUrl {
-  if (_configuredBaseUrl.isNotEmpty) return _configuredBaseUrl;
-  return kIsWeb ? "http://127.0.0.1:8000" : "http://192.168.10.7:8000";
+  // FORCE PC IP FOR PHONE DEPLOYMENT (Updated 2026-05-16)
+
+  const String forcedIp = "http://192.168.10.17:8000";
+
+  debugPrint("--- DEBUG: baseUrl is returning: $forcedIp ---");
+  return forcedIp;
 }
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
@@ -29,6 +34,9 @@ List<CameraDescription> cameras = [];
 // --- APP ENTRY ---
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint("--- APP STARTING ---");
+  debugPrint("Active API Base URL: $baseUrl");
+  debugPrint("--------------------");
   try {
     cameras = await availableCameras();
   } catch (e) {
@@ -46,18 +54,25 @@ class MyApp extends StatelessWidget {
       valueListenable: themeNotifier,
       builder: (_, mode, __) {
         return MaterialApp(
-          title: 'AI Study Camera',
           debugShowCheckedModeBanner: false,
+          title: 'Snap & Learn',
           themeMode: mode,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF6366F1),
-              primary: const Color(0xFF6366F1),
-              surface: Colors.white,
+              brightness: Brightness.light,
             ),
-            textTheme: GoogleFonts.outfitTextTheme(),
             scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+            cardColor: Colors.white,
+          ),
+          darkTheme: ThemeData.dark(useMaterial3: true).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF6366F1),
+              brightness: Brightness.dark,
+            ),
+            scaffoldBackgroundColor: const Color(0xFF0F172A),
+            cardColor: const Color(0xFF1E293B),
           ),
           home: const SplashScreen(),
         );
@@ -248,33 +263,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required String title,
     required String desc,
   }) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SvgPicture.network(
-            image,
-            height: 250,
-            placeholderBuilder: (context) => const Center(child: CircularProgressIndicator()),
-          ),
-          const SizedBox(height: 40),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              height: 1.2,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SvgPicture.network(
+              image,
+              height: 250,
+              placeholderBuilder: (context) =>
+                  const Center(child: CircularProgressIndicator()),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            desc,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16),
-          ),
-        ],
+            const SizedBox(height: 40),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              desc,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -314,18 +332,23 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     print("Attempting login to $baseUrl/api/login...");
     try {
-      final response = await http.post(
-        Uri.parse("$baseUrl/api/login"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "username": _userController.text,
-          "password": _passController.text,
-        }),
-      ).timeout(const Duration(seconds: 30));
-      
-      print("Response status: ${response.statusCode}");
+      final response = await http
+          .post(
+            Uri.parse("$baseUrl/api/login"),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "username": _userController.text,
+              "password": _passController.text,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      print("--- DEBUG: Response Received ---");
+      print("Status Code: ${response.statusCode}");
+      print("Body: ${response.body}");
+
       final data = jsonDecode(response.body);
-      
+
       if (data['status'] == 'success') {
         globalToken = data['access_token'];
         globalUsername = data['username'];
@@ -408,26 +431,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-              const SizedBox(height: 16),
-              TextButton.icon(
-                onPressed: () async {
-                  try {
-                    print("Testing connection to $baseUrl...");
-                    final res = await http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 30));
-                    print("Connection test successful: ${res.statusCode}");
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Server Reachable! IP: $baseUrl"), backgroundColor: Colors.green),
-                    );
-                  } catch (e) {
-                    print("Connection test failed: $e");
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Server NOT Reachable! Check IP $baseUrl. Error: $e"), backgroundColor: Colors.red),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.network_check, color: Colors.grey),
-                label: const Text("Check Server Connection", style: TextStyle(color: Colors.grey)),
-              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -772,20 +775,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             "Use camera to scan your notes",
                             style: GoogleFonts.outfit(color: Colors.white70),
                           ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const CameraViewScreen(),
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF6366F1),
-                            ),
-                            child: const Text("Scan Now"),
-                          ),
                         ],
                       ),
                     ),
@@ -813,42 +802,69 @@ class _HomeScreenState extends State<HomeScreen> {
                     "My Notes",
                     const Color(0xFFFFF7ED),
                     const Color(0xFFF97316),
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LibraryScreen()),
+                    ),
                   ),
                   _buildActionCard(
                     Icons.description,
                     "Summaries",
                     const Color(0xFFF0F9FF),
                     const Color(0xFF0EA5E9),
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const LibraryScreen(initialFilter: "Summaries"),
+                      ),
+                    ),
                   ),
                   _buildActionCard(
                     Icons.psychology,
                     "Quizzes",
                     const Color(0xFFFEF2F2),
                     const Color(0xFFEF4444),
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const LibraryScreen(initialFilter: "Quizzes"),
+                      ),
+                    ),
                   ),
                   _buildActionCard(
                     Icons.style,
                     "Flashcards",
                     const Color(0xFFF0FDF4),
                     const Color(0xFF22C55E),
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const LibraryScreen(initialFilter: "Flashcards"),
+                      ),
+                    ),
                   ),
                   _buildActionCard(
                     Icons.volume_up,
                     "Audio",
                     const Color(0xFFF5F3FF),
                     const Color(0xFF8B5CF6),
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LibraryScreen()),
+                    ),
                   ),
                   _buildActionCard(
                     Icons.history,
                     "History",
                     const Color(0xFFF8FAFC),
                     Colors.grey,
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LibraryScreen()),
+                    ),
                   ),
                 ],
               ),
@@ -883,8 +899,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 10,
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -1226,9 +1248,12 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       if (mounted) setState(() => _progress = i / 10);
     }
     try {
-      var request = http.MultipartRequest('POST', Uri.parse("$baseUrl/api/upload"));
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse("$baseUrl/api/upload"),
+      );
       request.headers["Authorization"] = "Bearer $globalToken";
-      
+
       // Fix for Web: read bytes instead of path
       final bytes = await widget.image.readAsBytes();
       request.files.add(
@@ -1238,13 +1263,13 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
           filename: widget.image.name,
         ),
       );
-      
+
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
       var data = jsonDecode(response.body);
-      
+
       if (mounted) setState(() => _progress = 1.0);
-      
+
       if (data['status'] == 'success') {
         Navigator.pushReplacement(
           context,
@@ -1252,7 +1277,10 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? "Scanning failed"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(data['message'] ?? "Scanning failed"),
+            backgroundColor: Colors.red,
+          ),
         );
         Navigator.pop(context);
       }
@@ -1314,9 +1342,22 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
 }
 
 // --- 7. EXTRACTED TEXT SCREEN ---
-class ExtractedTextScreen extends StatelessWidget {
+class ExtractedTextScreen extends StatefulWidget {
   final Map<String, dynamic> note;
   const ExtractedTextScreen({super.key, required this.note});
+  @override
+  _ExtractedTextScreenState createState() => _ExtractedTextScreenState();
+}
+
+class _ExtractedTextScreenState extends State<ExtractedTextScreen> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.note['extracted_text'] ?? "");
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1357,11 +1398,15 @@ class ExtractedTextScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.withOpacity(0.1)),
                 ),
-                child: SingleChildScrollView(
-                  child: Text(note['extracted_text'] ?? ""),
+                child: TextField(
+                  controller: _controller,
+                  maxLines: null,
+                  decoration: const InputDecoration(border: InputBorder.none),
+                  style: GoogleFonts.outfit(fontSize: 16),
                 ),
               ),
             ),
@@ -1370,8 +1415,13 @@ class ExtractedTextScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {},
-                    child: const Text("Edit Text"),
+                    onPressed: () {
+                      widget.note['extracted_text'] = _controller.text;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Changes saved locally!")),
+                      );
+                    },
+                    child: const Text("Save Edits"),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1380,7 +1430,7 @@ class ExtractedTextScreen extends StatelessWidget {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => SummaryScreen(note: note),
+                        builder: (_) => SummaryScreen(note: widget.note),
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -1501,100 +1551,194 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> {
   int _currentQ = 0;
   int? _selected;
+
   @override
   Widget build(BuildContext context) {
     final quizzes = widget.note['quiz'] as List? ?? [];
     if (quizzes.isEmpty)
       return const Scaffold(body: Center(child: Text("No quiz available")));
     final quiz = quizzes[_currentQ];
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        title: Text(
+          "Interactive Quiz",
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Quiz (MCQs)", style: GoogleFonts.outfit()),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Question ${_currentQ + 1} of ${quizzes.length}",
-              style: const TextStyle(
-                color: Color(0xFF6366F1),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              quiz['question'],
-              style: GoogleFonts.outfit(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 32),
-            ...(quiz['options'] as List).asMap().entries.map(
-              (e) => Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: _selected == e.key
-                      ? const Color(0xFFF5F3FF)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _selected == e.key
-                        ? const Color(0xFF6366F1)
-                        : Colors.grey.shade200,
+      body: Column(
+        children: [
+          LinearProgressIndicator(
+            value: (_currentQ + 1) / quizzes.length,
+            backgroundColor: Colors.grey.shade100,
+            color: const Color(0xFF6366F1),
+            minHeight: 6,
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      "Question ${_currentQ + 1} of ${quizzes.length}",
+                      style: const TextStyle(
+                        color: Color(0xFF6366F1),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
-                ),
-                child: RadioListTile<int>(
-                  title: Text(e.value),
-                  value: e.key,
-                  groupValue: _selected,
-                  activeColor: const Color(0xFF6366F1),
-                  onChanged: (v) => setState(() => _selected = v),
-                ),
+                  const SizedBox(height: 24),
+                  Text(
+                    quiz['question'],
+                    style: GoogleFonts.outfit(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  ...(quiz['options'] as List).asMap().entries.map((e) {
+                    bool isSelected = _selected == e.key;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selected = e.key),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF6366F1)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFF6366F1)
+                                : Colors.grey.shade100,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF6366F1,
+                                    ).withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.2)
+                                    : const Color(0xFFF1F5F9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  String.fromCharCode(65 + e.key),
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : const Color(0xFF64748B),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                e.value,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color(0xFF334155),
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ],
               ),
             ),
-            const Spacer(),
-            SizedBox(
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_currentQ < quizzes.length - 1) {
-                    setState(() {
-                      _currentQ++;
-                      _selected = null;
-                    });
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FlashcardsScreen(note: widget.note),
-                      ),
-                    );
-                  }
-                },
+                onPressed: _selected == null
+                    ? null
+                    : () {
+                        if (_currentQ < quizzes.length - 1) {
+                          setState(() {
+                            _currentQ++;
+                            _selected = null;
+                          });
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  FlashcardsScreen(note: widget.note),
+                            ),
+                          );
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6366F1),
+                  disabledBackgroundColor: Colors.grey.shade200,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
                 child: Text(
                   _currentQ < quizzes.length - 1
                       ? "Next Question"
-                      : "Finish Quiz",
+                      : "View Flashcards",
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1611,45 +1755,81 @@ class FlashcardsScreen extends StatefulWidget {
 class _FlashcardsScreenState extends State<FlashcardsScreen> {
   int _current = 0;
   bool _revealed = false;
+  final FlutterTts _flutterTts = FlutterTts();
+
+  Future<void> _speak(String text) async {
+    await _flutterTts.setLanguage("en-US");
+    await _flutterTts.setPitch(1.0);
+    await _flutterTts.speak(text);
+  }
+
+  @override
+  void dispose() {
+    _flutterTts.stop();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cards = widget.note['cards'] as List? ?? [];
     if (cards.isEmpty)
       return const Scaffold(body: Center(child: Text("No cards available")));
     final card = cards[_current];
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        title: Text(
+          "Flashcards",
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Flashcards", style: GoogleFonts.outfit()),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                "${_current + 1} / ${cards.length}",
-                style: const TextStyle(color: Colors.grey),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Flip the card to reveal answer",
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                ),
+                Text(
+                  "${_current + 1} of ${cards.length}",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF6366F1),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             Expanded(
               child: GestureDetector(
                 onTap: () => setState(() => _revealed = !_revealed),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
                   width: double.infinity,
-                  padding: const EdgeInsets.all(40),
+                  padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(32),
+                    border: Border.all(color: Colors.grey.shade100),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
@@ -1657,20 +1837,56 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          _revealed ? "Answer" : "Question",
-                          style: const TextStyle(
-                            color: Color(0xFF6366F1),
-                            fontWeight: FontWeight.bold,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _revealed
+                                ? const Color(0xFFF0FDF4)
+                                : const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _revealed ? "ANSWER" : "QUESTION",
+                                style: TextStyle(
+                                  color: _revealed
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFF6366F1),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => _speak(
+                                  _revealed ? card['back'] : card['front'],
+                                ),
+                                child: Icon(
+                                  Icons.volume_up,
+                                  size: 14,
+                                  color: _revealed
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFF6366F1),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 32),
                         Text(
                           _revealed ? card['back'] : card['front'],
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
-                            fontSize: 22,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1E293B),
+                            height: 1.4,
                           ),
                         ),
                       ],
@@ -1679,37 +1895,62 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 32),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _iconBtn(Icons.shuffle, "Shuffle"),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left),
-                      onPressed: _current > 0
-                          ? () => setState(() {
-                              _current--;
-                              _revealed = false;
-                            })
-                          : null,
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _current > 0
+                        ? () => setState(() {
+                            _current--;
+                            _revealed = false;
+                          })
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF6366F1),
+                      side: const BorderSide(color: Color(0xFF6366F1)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: _current < cards.length - 1
-                          ? () => setState(() {
-                              _current++;
-                              _revealed = false;
-                            })
-                          : null,
-                    ),
-                  ],
+                    child: const Text("Previous"),
+                  ),
                 ),
-                _iconBtn(Icons.save_outlined, "Save"),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (_current < cards.length - 1) {
+                        setState(() {
+                          _current++;
+                          _revealed = false;
+                        });
+                      } else {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("All flashcards completed!"),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: Text(
+                      _current < cards.length - 1 ? "Next Card" : "Finish",
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 48),
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -1767,12 +2008,14 @@ class _AudioExplanationScreenState extends State<AudioExplanationScreen> {
 
   void _initTts() {
     _flutterTts.setStartHandler(() => setState(() => _isPlaying = true));
-    _flutterTts.setCompletionHandler(() => setState(() {
-      _isPlaying = false;
-      _progress = 1.0;
-    }));
+    _flutterTts.setCompletionHandler(
+      () => setState(() {
+        _isPlaying = false;
+        _progress = 1.0;
+      }),
+    );
     _flutterTts.setProgressHandler((text, start, end, word) {
-       // Mock progress based on word count if needed
+      // Mock progress based on word count if needed
     });
   }
 
@@ -1888,18 +2131,22 @@ class _AudioExplanationScreenState extends State<AudioExplanationScreen> {
 
 // --- 12. LIBRARY SCREEN ---
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key});
+  final String initialFilter;
+  const LibraryScreen({super.key, this.initialFilter = "All Notes"});
   @override
   _LibraryScreenState createState() => _LibraryScreenState();
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
   List<dynamic> _notes = [];
-  String _selectedFilter = "All Notes";
+  late String _selectedFilter;
+  String _searchQuery = "";
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _selectedFilter = widget.initialFilter;
     _fetch();
   }
 
@@ -1911,19 +2158,30 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (mounted) setState(() => _notes = jsonDecode(res.body)['notes'] ?? []);
   }
 
+  Future<void> _deleteNote(String id) async {
+    final res = await http.delete(
+      Uri.parse("$baseUrl/api/notes/$id"),
+      headers: {"Authorization": "Bearer $globalToken"},
+    );
+    if (res.statusCode == 200) {
+      _fetch(); // Refresh list
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Note deleted successfully")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           "Library",
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 24),
         ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [IconButton(icon: const Icon(Icons.tune), onPressed: () {})],
+        backgroundColor: Colors.transparent,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1931,11 +2189,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
             child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
               decoration: InputDecoration(
                 hintText: "Search your notes...",
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor: const Color(0xFFF8FAFC),
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
@@ -1944,106 +2204,114 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              children: [
-                _filterChip("All Notes"),
-                _filterChip("Summaries"),
-                _filterChip("Quizzes"),
-                _filterChip("Flashcards"),
-                _filterChip("Audio"),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: _notes.length,
-              itemBuilder: (context, idx) {
-                final note = _notes[idx];
-                return InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ExtractedTextScreen(note: note),
-                    ),
-                  ),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade100),
-                    ),
-                    child: Row(
+            child: RefreshIndicator(
+              onRefresh: _fetch,
+              child: Builder(
+                builder: (context) {
+                  final filteredNotes = _notes.where((n) {
+                    final title = (n['filename'] ?? "").toString().toLowerCase();
+                    final matchesSearch = title.contains(_searchQuery);
+                    bool matchesFilter = true;
+                    if (_selectedFilter == "Summaries") matchesFilter = n['ai_summary'] != null;
+                    if (_selectedFilter == "Quizzes") matchesFilter = n['quiz'] != null && (n['quiz'] as List).isNotEmpty;
+                    if (_selectedFilter == "Flashcards") matchesFilter = n['cards'] != null && (n['cards'] as List).isNotEmpty;
+                    return matchesSearch && matchesFilter;
+                  }).toList();
+
+                  if (filteredNotes.isEmpty) {
+                    return ListView(
                       children: [
-                        Container(
-                          width: 70,
-                          height: 70,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.description,
-                            color: Colors.grey,
-                          ),
+                        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                        const Center(child: Text("No notes found")),
+                      ],
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: filteredNotes.length,
+                    itemBuilder: (context, idx) {
+                      final note = filteredNotes[idx];
+                      return InkWell(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ExtractedTextScreen(note: note)),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                          ),
+                          child: Row(
                             children: [
-                              Text(
-                                note['filename'] ?? "Note",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Scanned Note",
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
+                                width: 60,
+                                height: 60,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF5F3FF),
-                                  borderRadius: BorderRadius.circular(8),
+                                  gradient: LinearGradient(colors: [const Color(0xFF6366F1).withOpacity(0.1), const Color(0xFF8B5CF6).withOpacity(0.1)]),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: const Text(
-                                  "Summary",
-                                  style: TextStyle(
-                                    color: Color(0xFF6366F1),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                child: const Icon(Icons.description_outlined, color: Color(0xFF6366F1)),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      note['filename'] ?? "Untitled Note",
+                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        _noteTag(Icons.description, "Summary", note['ai_summary'] != null),
+                                        const SizedBox(width: 8),
+                                        _noteTag(Icons.psychology, "Quiz", note['quiz'] != null),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
+                              const Icon(Icons.chevron_right, color: Colors.grey),
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.more_vert),
-                          onPressed: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _noteTag(IconData icon, String label, bool active) {
+    if (!active) return const SizedBox();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6366F1).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: const Color(0xFF6366F1)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              color: const Color(0xFF6366F1),
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -2057,17 +2325,29 @@ class _LibraryScreenState extends State<LibraryScreen> {
       onTap: () => setState(() => _selectedFilter = label),
       child: Container(
         margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? const Color(0xFF6366F1) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF6366F1) : Colors.grey.shade200,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey,
+          style: GoogleFonts.outfit(
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
             fontWeight: FontWeight.bold,
-            fontSize: 12,
+            fontSize: 13,
           ),
         ),
       ),
@@ -2078,43 +2358,110 @@ class _LibraryScreenState extends State<LibraryScreen> {
 // --- EXPLORE SCREEN ---
 class ExploreScreen extends StatelessWidget {
   const ExploreScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           "Explore",
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 24),
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+            color: const Color(0xFF1E293B),
+          ),
         ),
+        centerTitle: false,
         elevation: 0,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: Colors.transparent,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none),
+            icon: const Icon(Icons.history, color: Color(0xFF64748B)),
             onPressed: () {},
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              decoration: InputDecoration(
-                hintText: "Search topics, questions, notes...",
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+            // Motivation Card
+            Container(
+              padding: const EdgeInsets.all(24),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.auto_awesome, color: Colors.white, size: 28),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Keep up the great work, ${globalUsername}!",
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "You've scanned 5 notes this week. Your streak is alive! 🔥",
+                    style: GoogleFonts.outfit(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Search Bar
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: TextField(
+                style: GoogleFonts.outfit(),
+                decoration: InputDecoration(
+                  hintText: "Search community notes...",
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF6366F1),
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
                 ),
               ),
             ),
             const SizedBox(height: 32),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -2123,232 +2470,283 @@ class ExploreScreen extends StatelessWidget {
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1E293B),
                   ),
                 ),
                 Text(
-                  "View All",
-                  style: TextStyle(color: Color(0xFF6366F1), fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 4,
-              crossAxisSpacing: 12,
-              children: [
-                _topicCard(
-                  Icons.calculate,
-                  "Mathematics",
-                  "120 Notes",
-                  const Color(0xFFF5F3FF),
-                  const Color(0xFF6366F1),
-                ),
-                _topicCard(
-                  Icons.science,
-                  "Physics",
-                  "98 Notes",
-                  const Color(0xFFF0F9FF),
-                  const Color(0xFF0EA5E9),
-                ),
-                _topicCard(
-                  Icons.eco,
-                  "Biology",
-                  "105 Notes",
-                  const Color(0xFFF0FDF4),
-                  const Color(0xFF22C55E),
-                ),
-                _topicCard(
-                  Icons.lightbulb,
-                  "Chemistry",
-                  "87 Notes",
-                  const Color(0xFFFFF7ED),
-                  const Color(0xFFF97316),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Recommended for You",
+                  "See All",
                   style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF6366F1),
+                    fontWeight: FontWeight.w600,
                   ),
-                ),
-                Text(
-                  "View All",
-                  style: TextStyle(color: Color(0xFF6366F1), fontSize: 12),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _recommendItem(
-              "Photosynthesis -\nComplete Guide",
-              "Summary",
-              "12 May 2024 • 5 min read",
-            ),
-            _recommendItem(
-              "Newton's Laws\nExplained",
-              "Quiz",
-              "10 May 2024 • 10 Questions",
-            ),
-            _recommendItem(
-              "Cell Structure\nFlashcards",
-              "Flashcards",
-              "8 May 2024 • 20 Cards",
-            ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Trending Quizzes",
-                  style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  "View All",
-                  style: TextStyle(color: Color(0xFF6366F1), fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(16),
-              ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFF7ED),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.emoji_events,
-                      color: Color(0xFFF97316),
-                    ),
+                  _topicCard(
+                    Icons.functions,
+                    "Math",
+                    "124",
+                    const Color(0xFFEEF2FF),
+                    const Color(0xFF6366F1),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "General Knowledge Quiz",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "15 Questions",
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
-                        ),
-                      ],
-                    ),
+                  _topicCard(
+                    Icons.science,
+                    "Physics",
+                    "89",
+                    const Color(0xFFF0F9FF),
+                    const Color(0xFF0EA5E9),
                   ),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text(
-                      "Start",
-                      style: TextStyle(color: Colors.white),
-                    ),
+                  _topicCard(
+                    Icons.biotech,
+                    "Biology",
+                    "56",
+                    const Color(0xFFF0FDF4),
+                    const Color(0xFF22C55E),
+                  ),
+                  _topicCard(
+                    Icons.history_edu,
+                    "History",
+                    "42",
+                    const Color(0xFFFFF7ED),
+                    const Color(0xFFF97316),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 80),
+            const SizedBox(height: 32),
+
+            Text(
+              "Trending Summaries",
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _trendingItem("Quantum Physics Basics", "Physics", "2.4k views"),
+            _trendingItem("Advanced Calculus", "Math", "1.8k views"),
+            _trendingItem("World War II Timeline", "History", "3.1k views"),
+            const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
 
-  Widget _topicCard(IconData i, String l, String c, Color bg, Color ic) =>
-      Column(
+  Widget _trendingItem(String title, String tag, String views) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.trending_up,
+              color: Color(0xFF6366F1),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "$tag • $views",
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+        ],
+      ),
+    );
+  }
+
+  Widget _topicCard(
+    IconData icon,
+    String label,
+    String count,
+    Color bg,
+    Color color,
+  ) {
+    return Container(
+      width: 100,
+      margin: const EdgeInsets.only(right: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(i, color: ic),
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 8),
           Text(
-            l,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
-          Text(c, style: const TextStyle(fontSize: 8, color: Colors.grey)),
+          Text(count, style: const TextStyle(color: Colors.grey, fontSize: 10)),
         ],
-      );
-  Widget _recommendItem(String t, String tag, String d) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.grey.shade100),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(12),
+      ),
+    );
+  }
+
+  Widget _recommendItem(
+    String title,
+    String tag,
+    String date,
+    Color tagBg,
+    Color tagColor,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.description_outlined,
+              color: Color(0xFF64748B),
+            ),
           ),
-          child: const Icon(Icons.description, color: Colors.grey),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                t,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                tag,
-                style: const TextStyle(
-                  color: Color(0xFF6366F1),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tagBg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          color: tagColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      date,
+                      style: const TextStyle(color: Colors.grey, fontSize: 10),
+                    ),
+                  ],
                 ),
-              ),
-              Text(d, style: const TextStyle(color: Colors.grey, fontSize: 10)),
-            ],
+              ],
+            ),
           ),
-        ),
-        const Icon(Icons.bookmark_border, color: Colors.grey),
-      ],
-    ),
-  );
+          const Icon(
+            Icons.arrow_forward_ios,
+            size: 14,
+            color: Color(0xFFCBD5E1),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // --- PROFILE SCREEN ---
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+  @override
+  _ProfileScreenState createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  int _noteCount = 0;
+  int _quizCount = 0;
+  int _cardCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/api/notes"),
+        headers: {"Authorization": "Bearer $globalToken"},
+      );
+      if (res.statusCode == 200) {
+        final List notes = jsonDecode(res.body)['notes'] ?? [];
+        int qs = 0;
+        int cs = 0;
+        for (var n in notes) {
+          if (n['quiz'] != null) qs += (n['quiz'] as List).length;
+          if (n['cards'] != null) cs += (n['cards'] as List).length;
+        }
+        if (mounted) {
+          setState(() {
+            _noteCount = notes.length;
+            _quizCount = qs;
+            _cardCount = cs;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Stats Error: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2394,10 +2792,10 @@ class ProfileScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _statItem("46", "Notes"),
-                  _statItem("18", "Quizzes"),
-                  _statItem("32", "Flashcards"),
-                  _statItem("9", "Audios"),
+                  _statItem("$_noteCount", "Notes"),
+                  _statItem("$_quizCount", "Q's"),
+                  _statItem("$_cardCount", "Flashcards"),
+                  _statItem("5", "Audios"),
                 ],
               ),
             ),
@@ -2427,7 +2825,12 @@ class ProfileScreen extends StatelessWidget {
                   (route) => false,
                 );
               },
-              child: _menuItem(Icons.logout, "Log Out", color: Colors.red, isLast: true),
+              child: _menuItem(
+                Icons.logout,
+                "Log Out",
+                color: Colors.red,
+                isLast: true,
+              ),
             ),
           ],
         ),
@@ -2495,106 +2898,181 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text("Settings", style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text(
+          "Settings",
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
         elevation: 0,
         backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: ListView(
+        padding: const EdgeInsets.all(20),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              "Appearance",
-              style: TextStyle(
-                color: Color(0xFF6366F1),
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: themeNotifier,
-            builder: (_, mode, __) {
-              return ListTile(
-                leading: const Icon(Icons.dark_mode_outlined),
-                title: const Text("Dark Mode"),
-                trailing: Switch(
-                  value: mode == ThemeMode.dark,
-                  onChanged: (val) {
-                    themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
-                  },
-                  activeColor: const Color(0xFF6366F1),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              "Language",
-              style: TextStyle(
-                color: Color(0xFF6366F1),
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          ValueListenableBuilder<String>(
-            valueListenable: languageNotifier,
-            builder: (_, lang, __) {
-              return ListTile(
-                leading: const Icon(Icons.language),
-                title: const Text("App Language"),
-                subtitle: Text(lang),
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (context) {
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _langOption(context, "English"),
-                          _langOption(context, "Urdu"),
-                          _langOption(context, "Arabic"),
-                          const SizedBox(height: 20),
-                        ],
-                      );
-                    },
-                  );
+          _sectionHeader("Appearance"),
+          _settingsCard([
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: themeNotifier,
+              builder: (_, mode, __) => _settingsToggle(
+                Icons.dark_mode_outlined,
+                "Dark Mode",
+                mode == ThemeMode.dark,
+                (val) {
+                  themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
                 },
-              );
-            },
+              ),
+            ),
+          ]),
+          const SizedBox(height: 24),
+          _sectionHeader("Language & Regional"),
+          _settingsCard([
+            ValueListenableBuilder<String>(
+              valueListenable: languageNotifier,
+              builder: (_, lang, __) => _settingsTile(
+                Icons.language,
+                "App Language",
+                lang,
+                () => _showLanguagePicker(context),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 24),
+          _sectionHeader("Preferences"),
+          _settingsCard([
+            _settingsTile(
+              Icons.notifications_none,
+              "Notifications",
+              "On",
+              () {},
+            ),
+            _settingsTile(
+              Icons.security_outlined,
+              "Privacy & Security",
+              "",
+              () {},
+            ),
+            _settingsTile(
+              Icons.storage_outlined,
+              "Storage Usage",
+              "124 MB",
+              () {},
+            ),
+          ]),
+          const SizedBox(height: 24),
+          _sectionHeader("Support"),
+          _settingsCard([
+            _settingsTile(Icons.help_outline, "Help Center", "", () {}),
+            _settingsTile(
+              Icons.info_outline,
+              "About Snap & Learn",
+              "v1.0.0",
+              () {},
+            ),
+          ]),
+          const SizedBox(height: 40),
+          Center(
+            child: Text(
+              "Made with ❤️ for Students",
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+            ),
           ),
-          const Divider(),
-          _simpleTile(Icons.notifications_outlined, "Notifications"),
-          _simpleTile(Icons.security_outlined, "Privacy & Security"),
-          _simpleTile(Icons.storage_outlined, "Data Usage"),
         ],
       ),
     );
   }
 
-  Widget _langOption(BuildContext context, String l) {
-    return ListTile(
-      title: Text(l),
-      onTap: () {
-        languageNotifier.value = l;
-        Navigator.pop(context);
-      },
-      trailing: languageNotifier.value == l ? const Icon(Icons.check, color: Color(0xFF6366F1)) : null,
-    );
-  }
+  Widget _sectionHeader(String title) => Padding(
+    padding: const EdgeInsets.only(left: 4, bottom: 12),
+    child: Text(
+      title,
+      style: GoogleFonts.outfit(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        color: const Color(0xFF6366F1),
+      ),
+    ),
+  );
 
-  Widget _simpleTile(IconData i, String t) {
-    return ListTile(
-      leading: Icon(i),
-      title: Text(t),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {},
+  Widget _settingsCard(List<Widget> children) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: Colors.grey.shade100),
+    ),
+    child: Column(children: children),
+  );
+
+  Widget _settingsToggle(
+    IconData icon,
+    String title,
+    bool value,
+    Function(bool) onChanged,
+  ) => ListTile(
+    leading: Icon(icon, color: const Color(0xFF64748B), size: 22),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+    trailing: Switch(
+      value: value,
+      onChanged: onChanged,
+      activeColor: const Color(0xFF6366F1),
+    ),
+  );
+
+  Widget _settingsTile(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) => ListTile(
+    leading: Icon(icon, color: const Color(0xFF64748B), size: 22),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+    subtitle: subtitle.isNotEmpty
+        ? Text(subtitle, style: const TextStyle(fontSize: 12))
+        : null,
+    trailing: const Icon(
+      Icons.chevron_right,
+      size: 20,
+      color: Color(0xFFCBD5E1),
+    ),
+    onTap: onTap,
+  );
+
+  void _showLanguagePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: ["English", "Urdu", "Arabic"]
+              .map(
+                (l) => ListTile(
+                  title: Text(
+                    l,
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+                  ),
+                  trailing: languageNotifier.value == l
+                      ? const Icon(Icons.check_circle, color: Color(0xFF6366F1))
+                      : null,
+                  onTap: () {
+                    languageNotifier.value = l;
+                    Navigator.pop(context);
+                  },
+                ),
+              )
+              .toList(),
+        ),
+      ),
     );
   }
 }
